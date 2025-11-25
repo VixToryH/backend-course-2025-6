@@ -210,6 +210,23 @@ if (method === "PUT" && url.startsWith("/inventory/") && url.endsWith("/photo"))
 }
 
 
+if (method === "DELETE" && url.startsWith("/inventory/")) {
+  const id = Number(url.split("/")[2]);
+  const index = inventory.findIndex(i => i.id === id);
+
+  if (index === -1) {
+    res.statusCode = 404;
+    return res.end("Not Found");
+  }
+
+  inventory.splice(index, 1);
+
+  res.statusCode = 200;
+  res.end("Deleted");
+  return;
+}
+
+
 
   res.statusCode = 405;
   res.end("Method Not Allowed");
