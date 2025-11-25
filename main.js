@@ -71,6 +71,7 @@ function handleRegister(req, res) {
   });
 }
 
+
 const server = http.createServer((req, res) => {
     const method = req.method;
     const url = req.url;
@@ -79,6 +80,44 @@ const server = http.createServer((req, res) => {
     handleRegister(req, res);
     return;
   }
+
+
+  if (method === "GET" && url === "/inventory") {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+
+  const result = inventory.map(item => ({
+    ...item,
+    photo: item.photo ? `/${options.cache}/${item.photo}` : null
+  }));
+
+  res.end(JSON.stringify(result));
+  return;
+}
+
+
+if (method === "GET" && url.startsWith("/inventory/")) {
+  const id = parseInt(url.split("/")[2]);
+
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    res.statusCode = 404;
+    res.end("Not Found");
+    return;
+  }
+
+  const enrichedItem = {
+    ...item,
+    photo: item.photo ? `/${options.cache}/${item.photo}` : null
+  };
+
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(enrichedItem));
+  return;
+}
+
 
   res.statusCode = 405;
   res.end("Method Not Allowed");
