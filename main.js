@@ -76,12 +76,26 @@ const server = http.createServer((req, res) => {
     const method = req.method;
     const url = req.url;
 
+    /**
+ * POST /register
+ * Створює новий інвентарний елемент.
+ * Формат: multipart/form-data
+ * Поля:
+ *  - inventory_name (string, required)
+ *  - description (string, optional)
+ *  - photo (file, optional)
+ * Повертає: створений item у JSON.
+ */
     if (method === "POST" && url === "/register") {
     handleRegister(req, res);
     return;
   }
 
-
+/**
+ * GET /inventory
+ * Отримує список усіх інвентарних елементів.
+ * Повертає масив JSON.
+ */
   if (method === "GET" && url === "/inventory") {
   res.statusCode = 200;
   res.setHeader("Content-Type", "application/json");
@@ -95,7 +109,14 @@ const server = http.createServer((req, res) => {
   return;
 }
 
-
+/**
+ * PUT /inventory/:id/photo
+ * Оновлює фотографію інвентарного елемента.
+ * Формат: multipart/form-data
+ * Поле:
+ *  - photo (file, required)
+ * Повертає: оновлений item.
+ */
 if (method === "PUT" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
   const id = Number(url.split("/")[2]);
   const item = inventory.find(i => i.id === id);
@@ -133,7 +154,13 @@ if (method === "PUT" && url.startsWith("/inventory/") && url.endsWith("/photo"))
   return;
 }
 
-
+/**
+ * PUT /inventory/:id
+ * Оновлює назву або опис інвентарного елемента.
+ * Приймає JSON:
+ *  { "name": "...", "description": "..." }
+ * Повертає: оновлений item.
+ */
 if (method === "PUT" && url.startsWith("/inventory/")) {
   const id = Number(url.split("/")[2]);
   const item = inventory.find(i => i.id === id);
@@ -164,7 +191,10 @@ if (method === "PUT" && url.startsWith("/inventory/")) {
   return;
 }
 
-
+/**
+ * GET /inventory/:id/photo
+ * Повертає файл фотографії інвентарного елемента.
+ */
 if (method === "GET" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
   const id = Number(url.split("/")[2]);
   const item = inventory.find(i => i.id === id);
@@ -186,7 +216,10 @@ if (method === "GET" && url.startsWith("/inventory/") && url.endsWith("/photo"))
   return;
 }
 
-
+/**
+ * GET /inventory/:id
+ * Повертає один інвентарний елемент за ID.
+ */
 if (method === "GET" && url.startsWith("/inventory/")) {
   const id = parseInt(url.split("/")[2]);
 
@@ -209,7 +242,11 @@ if (method === "GET" && url.startsWith("/inventory/")) {
   return;
 }
 
-
+/**
+ * DELETE /inventory/:id
+ * Видаляє інвентарний елемент.
+ * Повертає: "Deleted"
+ */
 if (method === "DELETE" && url.startsWith("/inventory/")) {
   const id = Number(url.split("/")[2]);
   const index = inventory.findIndex(i => i.id === id);
@@ -226,7 +263,14 @@ if (method === "DELETE" && url.startsWith("/inventory/")) {
   return;
 }
 
-
+/**
+ * POST /search
+ * Шукає елемент по ID і може додати інфо про фото.
+ * Формат: x-www-form-urlencoded
+ * Параметри:
+ *  - id (number)
+ *  - has_photo = yes/no
+ */
 if (method === "POST" && url === "/search") {
   let body = "";
 
@@ -257,13 +301,49 @@ if (method === "POST" && url === "/search") {
   return;
 }
 
+/**
+ * GET /swagger.json
+ * Повертає Swagger-документацію в JSON.
+ */
+if (method === "GET" && url === "/swagger.json") {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  const swagger = fs.readFileSync("./swagger.json", "utf-8");
+  return res.end(swagger);
+}
+
+/**
+ * GET /docs
+ * Відображає Swagger UI.
+ */
+if (method === "GET" && url === "/docs") {
+  res.writeHead(200, { "Content-Type": "text/html" });
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>API Documentation</title>
+        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+      </head>
+      <body>
+        <div id="swagger"></div>
+        <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+        <script>
+          SwaggerUIBundle({
+            url: "/swagger.json",
+            dom_id: "#swagger"
+          });
+        </script>
+      </body>
+    </html>
+  `;
+  return res.end(html);
+}
 
   res.statusCode = 405;
   res.end("Method Not Allowed");
 });
+
   
 server.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}/`);
 });
-
-

@@ -1,8 +1,10 @@
 {
   "name": "lab_6",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "main.js",
+
   "scripts": {
     "start": "node main.js",
     "dev": "nodemon main.js",
@@ -22,7 +24,9 @@
   "dependencies": {
     "commander": "^14.0.2",
     "formidable": "^3.5.4",
-    "superagent": "^10.2.3"
+    "superagent": "^10.2.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
