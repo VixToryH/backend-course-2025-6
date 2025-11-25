@@ -1,21 +1,11 @@
 import { Command } from "commander";
 import fs from "fs";
 import http from "http";
+import formidable from "formidable";
+import path from "path";
 
 let inventory = [];
 let nextId = 1;
-
-function createInventoryItem(name, description, photoPath) {
-  const item = {
-    id: nextId++,
-    name,
-    description,
-    photo: photoPath
-  };
-
-  inventory.push(item);
-  return item;
-}
 
 const program = new Command();
 
@@ -32,12 +22,68 @@ if (!fs.existsSync(options.cache)) {
   fs.mkdirSync(options.cache, { recursive: true });
 }
 
-const server = http.createServer((req, res) => {
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "text/plain");
-  res.end("Inventory server is running\n");
-});
+function createInventoryItem(name, description, photoPath) {
+  const item = {
+    id: nextId++,
+    name,
+    description,
+    photo: photoPath
+  };
 
+  inventory.push(item);
+  return item;
+}
+
+function handleRegister(req, res) {
+  const form = formidable({
+    uploadDir: options.cache,
+    keepExtensions: true
+  });
+
+  form.parse(req, (err, fields, files) => {
+    if (err) {
+      res.statusCode = 500;
+      res.end("Error parsing form");
+      return;
+    }
+
+    const name = fields.inventory_name;
+    const description = fields.description || "";
+    const photo = files.photo;
+
+    if (!name) {
+      res.statusCode = 400;
+      res.end("inventory_name is required");
+      return;
+    }
+
+    let photoPath = null;
+
+    if (photo && photo[0]) {
+      photoPath = path.basename(photo[0].filepath);
+    }
+
+    const item = createInventoryItem(name, description, photoPath);
+
+    res.statusCode = 201;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(item));
+  });
+}
+
+const server = http.createServer((req, res) => {
+    const method = req.method;
+    const url = req.url;
+
+    if (method === "POST" && url === "/register") {
+    handleRegister(req, res);
+    return;
+  }
+
+  res.statusCode = 405;
+  res.end("Method Not Allowed");
+});
+  
 server.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}/`);
 });
