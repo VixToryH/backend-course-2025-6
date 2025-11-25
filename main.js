@@ -227,6 +227,36 @@ if (method === "DELETE" && url.startsWith("/inventory/")) {
 }
 
 
+if (method === "POST" && url === "/search") {
+  let body = "";
+
+  req.on("data", chunk => body += chunk);
+  req.on("end", () => {
+    const params = new URLSearchParams(body);
+
+    const id = Number(params.get("id"));
+    const hasPhoto = params.get("has_photo"); 
+
+    const item = inventory.find(i => i.id === id);
+
+    if (!item) {
+      res.statusCode = 404;
+      return res.end("Not Found");
+    }
+
+    let result = { ...item };
+
+    if (hasPhoto === "yes" && item.photo) {
+      result.description += ` (Photo: /${options.cache}/${item.photo})`;
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(result));
+  });
+
+  return;
+}
+
 
   res.statusCode = 405;
   res.end("Method Not Allowed");
