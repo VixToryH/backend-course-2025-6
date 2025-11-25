@@ -150,6 +150,67 @@ if (method === "PUT" && url.startsWith("/inventory/")) {
 }
 
 
+if (method === "GET" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
+  const id = Number(url.split("/")[2]);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item || !item.photo) {
+    res.statusCode = 404;
+    return res.end("Not Found");
+  }
+
+  const filePath = `${options.cache}/${item.photo}`;
+
+  if (!fs.existsSync(filePath)) {
+    res.statusCode = 404;
+    return res.end("Photo not found");
+  }
+
+  res.writeHead(200, { "Content-Type": "image/jpeg" });
+  fs.createReadStream(filePath).pipe(res);
+  return;
+}
+
+
+if (method === "PUT" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
+  const id = Number(url.split("/")[2]);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    res.statusCode = 404;
+    return res.end("Not Found");
+  }
+
+  const form = formidable({
+    uploadDir: options.cache,
+    keepExtensions: true
+  });
+
+  form.parse(req, (err, fields, files) => {
+    if (err) {
+      res.statusCode = 500;
+      return res.end("Error parsing form");
+    }
+
+    const photo = files.photo;
+
+    if (photo && photo[0]) {
+      const filename = path.basename(photo[0].filepath);
+      item.photo = filename;
+    } else {
+      res.statusCode = 400;
+      return res.end("Photo file required");
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(item));
+  });
+
+  return;
+}
+
+
+
   res.statusCode = 405;
   res.end("Method Not Allowed");
 });
