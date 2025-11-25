@@ -2,6 +2,21 @@ import { Command } from "commander";
 import fs from "fs";
 import http from "http";
 
+let inventory = [];
+let nextId = 1;
+
+function createInventoryItem(name, description, photoPath) {
+  const item = {
+    id: nextId++,
+    name,
+    description,
+    photo: photoPath
+  };
+
+  inventory.push(item);
+  return item;
+}
+
 const program = new Command();
 
 program
