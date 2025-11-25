@@ -1,1 +1,6 @@
 node_modules/
+cache/
+*.jpg
+*.jpeg
+*.png
+*.gif

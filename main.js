@@ -96,25 +96,40 @@ const server = http.createServer((req, res) => {
 }
 
 
-if (method === "GET" && url.startsWith("/inventory/")) {
-  const id = parseInt(url.split("/")[2]);
-
+if (method === "PUT" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
+  const id = Number(url.split("/")[2]);
   const item = inventory.find(i => i.id === id);
 
   if (!item) {
     res.statusCode = 404;
-    res.end("Not Found");
-    return;
+    return res.end("Not Found");
   }
 
-  const enrichedItem = {
-    ...item,
-    photo: item.photo ? `/${options.cache}/${item.photo}` : null
-  };
+  const form = formidable({
+    uploadDir: options.cache,
+    keepExtensions: true
+  });
 
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify(enrichedItem));
+  form.parse(req, (err, fields, files) => {
+    if (err) {
+      res.statusCode = 500;
+      return res.end("Error parsing form");
+    }
+
+    const photo = files.photo;
+
+    if (photo && photo[0]) {
+      const filename = path.basename(photo[0].filepath);
+      item.photo = filename;
+    } else {
+      res.statusCode = 400;
+      return res.end("Photo file required");
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(item));
+  });
+
   return;
 }
 
@@ -172,40 +187,25 @@ if (method === "GET" && url.startsWith("/inventory/") && url.endsWith("/photo"))
 }
 
 
-if (method === "PUT" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
-  const id = Number(url.split("/")[2]);
+if (method === "GET" && url.startsWith("/inventory/")) {
+  const id = parseInt(url.split("/")[2]);
+
   const item = inventory.find(i => i.id === id);
 
   if (!item) {
     res.statusCode = 404;
-    return res.end("Not Found");
+    res.end("Not Found");
+    return;
   }
 
-  const form = formidable({
-    uploadDir: options.cache,
-    keepExtensions: true
-  });
+  const enrichedItem = {
+    ...item,
+    photo: item.photo ? `/${options.cache}/${item.photo}` : null
+  };
 
-  form.parse(req, (err, fields, files) => {
-    if (err) {
-      res.statusCode = 500;
-      return res.end("Error parsing form");
-    }
-
-    const photo = files.photo;
-
-    if (photo && photo[0]) {
-      const filename = path.basename(photo[0].filepath);
-      item.photo = filename;
-    } else {
-      res.statusCode = 400;
-      return res.end("Photo file required");
-    }
-
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(item));
-  });
-
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(enrichedItem));
   return;
 }
 
