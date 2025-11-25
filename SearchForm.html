@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Search Inventory Item</title>
+</head>
+<body>
+  <h2>Search Inventory Item</h2>
+
+  <form action="/search" method="POST">
+    <label>Item ID:</label><br>
+    <input type="number" name="id" required><br><br>
+
+    <label>
+      <input type="checkbox" name="has_photo" value="yes">
+      Add photo link to description
+    </label><br><br>
+
+    <button type="submit">Search</button>
+  </form>
+
+</body>
+</html>
