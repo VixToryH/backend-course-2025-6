@@ -119,6 +119,37 @@ if (method === "GET" && url.startsWith("/inventory/")) {
 }
 
 
+if (method === "PUT" && url.startsWith("/inventory/")) {
+  const id = Number(url.split("/")[2]);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    res.statusCode = 404;
+    return res.end("Not Found");
+  }
+
+  let body = "";
+  req.on("data", chunk => body += chunk);
+  req.on("end", () => {
+    try {
+      const data = JSON.parse(body);
+
+      item.name = data.name ?? item.name;
+      item.description = data.description ?? item.description;
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(item));
+
+    } catch {
+      res.statusCode = 400;
+      res.end("Invalid JSON");
+    }
+  });
+
+  return;
+}
+
+
   res.statusCode = 405;
   res.end("Method Not Allowed");
 });
