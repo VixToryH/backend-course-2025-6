@@ -1,11 +1,8 @@
 import { Command } from "commander";
 import fs from "fs";
-import http from "http";
-import formidable from "formidable";
+import express from "express";
+import multer from "multer";
 import path from "path";
-
-let inventory = [];
-let nextId = 1;
 
 const program = new Command();
 
@@ -15,12 +12,27 @@ program
   .requiredOption("-c, --cache <path>", "Path to cache directory");
 
 program.parse(process.argv);
-
 const options = program.opts();
 
 if (!fs.existsSync(options.cache)) {
   fs.mkdirSync(options.cache, { recursive: true });
 }
+
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(`/${options.cache}`, express.static(options.cache)); // доступ до фото
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, options.cache),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
+});
+
+const upload = multer({ storage });
+
+let inventory = [];
+let nextId = 1;
+
 
 function createInventoryItem(name, description, photoPath) {
   const item = {
@@ -29,294 +41,174 @@ function createInventoryItem(name, description, photoPath) {
     description,
     photo: photoPath
   };
-
   inventory.push(item);
   return item;
 }
 
-function handleRegister(req, res) {
-  const form = formidable({
-    uploadDir: options.cache,
-    keepExtensions: true
-  });
-
-  form.parse(req, (err, fields, files) => {
-    if (err) {
-      res.statusCode = 500;
-      res.end("Error parsing form");
-      return;
-    }
-
-    const name = fields.inventory_name;
-    const description = fields.description || "";
-    const photo = files.photo;
-
-    if (!name) {
-      res.statusCode = 400;
-      res.end("inventory_name is required");
-      return;
-    }
-
-    let photoPath = null;
-
-    if (photo && photo[0]) {
-      photoPath = path.basename(photo[0].filepath);
-    }
-
-    const item = createInventoryItem(name, description, photoPath);
-
-    res.statusCode = 201;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify(item));
-  });
-}
-
-
-const server = http.createServer((req, res) => {
-    const method = req.method;
-    const url = req.url;
-
-    /**
+/**
  * POST /register
  * Створює новий інвентарний елемент.
- * Формат: multipart/form-data
- * Поля:
- *  - inventory_name (string, required)
- *  - description (string, optional)
- *  - photo (file, optional)
- * Повертає: створений item у JSON.
  */
-    if (method === "POST" && url === "/register") {
-    handleRegister(req, res);
-    return;
+app.post("/register", upload.single("photo"), (req, res) => {
+  const name = req.body.inventory_name;
+  const description = req.body.description || "";
+
+  if (!name) {
+    return res.status(400).json({ error: "inventory_name is required" });
   }
+
+  const photo = req.file ? req.file.filename : null;
+  const item = createInventoryItem(name, description, photo);
+
+  res.status(201).json(item);
+});
 
 /**
  * GET /inventory
  * Отримує список усіх інвентарних елементів.
- * Повертає масив JSON.
  */
-  if (method === "GET" && url === "/inventory") {
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "application/json");
-
+app.get("/inventory", (req, res) => {
   const result = inventory.map(item => ({
     ...item,
     photo: item.photo ? `/${options.cache}/${item.photo}` : null
   }));
-
-  res.end(JSON.stringify(result));
-  return;
-}
-
-/**
- * PUT /inventory/:id/photo
- * Оновлює фотографію інвентарного елемента.
- * Формат: multipart/form-data
- * Поле:
- *  - photo (file, required)
- * Повертає: оновлений item.
- */
-if (method === "PUT" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
-  const id = Number(url.split("/")[2]);
-  const item = inventory.find(i => i.id === id);
-
-  if (!item) {
-    res.statusCode = 404;
-    return res.end("Not Found");
-  }
-
-  const form = formidable({
-    uploadDir: options.cache,
-    keepExtensions: true
-  });
-
-  form.parse(req, (err, fields, files) => {
-    if (err) {
-      res.statusCode = 500;
-      return res.end("Error parsing form");
-    }
-
-    const photo = files.photo;
-
-    if (photo && photo[0]) {
-      const filename = path.basename(photo[0].filepath);
-      item.photo = filename;
-    } else {
-      res.statusCode = 400;
-      return res.end("Photo file required");
-    }
-
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(item));
-  });
-
-  return;
-}
-
-/**
- * PUT /inventory/:id
- * Оновлює назву або опис інвентарного елемента.
- * Приймає JSON:
- *  { "name": "...", "description": "..." }
- * Повертає: оновлений item.
- */
-if (method === "PUT" && url.startsWith("/inventory/")) {
-  const id = Number(url.split("/")[2]);
-  const item = inventory.find(i => i.id === id);
-
-  if (!item) {
-    res.statusCode = 404;
-    return res.end("Not Found");
-  }
-
-  let body = "";
-  req.on("data", chunk => body += chunk);
-  req.on("end", () => {
-    try {
-      const data = JSON.parse(body);
-
-      item.name = data.name ?? item.name;
-      item.description = data.description ?? item.description;
-
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(item));
-
-    } catch {
-      res.statusCode = 400;
-      res.end("Invalid JSON");
-    }
-  });
-
-  return;
-}
-
-/**
- * GET /inventory/:id/photo
- * Повертає файл фотографії інвентарного елемента.
- */
-if (method === "GET" && url.startsWith("/inventory/") && url.endsWith("/photo")) {
-  const id = Number(url.split("/")[2]);
-  const item = inventory.find(i => i.id === id);
-
-  if (!item || !item.photo) {
-    res.statusCode = 404;
-    return res.end("Not Found");
-  }
-
-  const filePath = `${options.cache}/${item.photo}`;
-
-  if (!fs.existsSync(filePath)) {
-    res.statusCode = 404;
-    return res.end("Photo not found");
-  }
-
-  res.writeHead(200, { "Content-Type": "image/jpeg" });
-  fs.createReadStream(filePath).pipe(res);
-  return;
-}
+  res.json(result);
+});
 
 /**
  * GET /inventory/:id
  * Повертає один інвентарний елемент за ID.
  */
-if (method === "GET" && url.startsWith("/inventory/")) {
-  const id = parseInt(url.split("/")[2]);
-
+app.get("/inventory/:id", (req, res) => {
+  const id = parseInt(req.params.id);
   const item = inventory.find(i => i.id === id);
 
   if (!item) {
-    res.statusCode = 404;
-    res.end("Not Found");
-    return;
+    return res.status(404).json({ error: "Not Found" });
   }
 
   const enrichedItem = {
     ...item,
     photo: item.photo ? `/${options.cache}/${item.photo}` : null
   };
+  res.json(enrichedItem);
+});
 
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify(enrichedItem));
-  return;
-}
+/**
+ * GET /inventory/:id/photo
+ * Повертає файл фотографії інвентарного елемента.
+ */
+app.get("/inventory/:id/photo", (req, res) => {
+  const id = Number(req.params.id);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item || !item.photo) {
+    return res.status(404).send("Not Found");
+  }
+
+  const filePath = path.join(options.cache, item.photo);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("Photo not found");
+  }
+
+  res.sendFile(filePath, { root: process.cwd() });
+});
+
+/**
+ * PUT /inventory/:id/photo
+ * Оновлює фотографію інвентарного елемента.
+ */
+app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
+  const id = Number(req.params.id);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: "Photo file required" });
+  }
+
+  item.photo = req.file.filename;
+  res.json(item);
+});
+
+/**
+ * PUT /inventory/:id
+ * Оновлює назву або опис інвентарного елемента.
+ */
+app.put("/inventory/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  const { name, description } = req.body;
+
+  if (name !== undefined) item.name = name;
+  if (description !== undefined) item.description = description;
+
+  res.json(item);
+});
 
 /**
  * DELETE /inventory/:id
  * Видаляє інвентарний елемент.
- * Повертає: "Deleted"
  */
-if (method === "DELETE" && url.startsWith("/inventory/")) {
-  const id = Number(url.split("/")[2]);
+app.delete("/inventory/:id", (req, res) => {
+  const id = Number(req.params.id);
   const index = inventory.findIndex(i => i.id === id);
 
   if (index === -1) {
-    res.statusCode = 404;
-    return res.end("Not Found");
+    return res.status(404).json({ error: "Not Found" });
   }
 
   inventory.splice(index, 1);
-
-  res.statusCode = 200;
-  res.end("Deleted");
-  return;
-}
+  res.send("Deleted");
+});
 
 /**
  * POST /search
  * Шукає елемент по ID і може додати інфо про фото.
- * Формат: x-www-form-urlencoded
- * Параметри:
- *  - id (number)
- *  - has_photo = yes/no
  */
-if (method === "POST" && url === "/search") {
-  let body = "";
+app.post("/search", (req, res) => {
+  const id = Number(req.body.id);
+  const hasPhoto = req.body.has_photo;
 
-  req.on("data", chunk => body += chunk);
-  req.on("end", () => {
-    const params = new URLSearchParams(body);
+  const item = inventory.find(i => i.id === id);
 
-    const id = Number(params.get("id"));
-    const hasPhoto = params.get("has_photo"); 
+  if (!item) {
+    return res.status(404).json({ error: "Not Found" });
+  }
 
-    const item = inventory.find(i => i.id === id);
+  let result = { ...item };
 
-    if (!item) {
-      res.statusCode = 404;
-      return res.end("Not Found");
-    }
+  if (hasPhoto === "yes" && item.photo) {
+    result.description += ` (Photo: /${options.cache}/${item.photo})`;
+  }
 
-    let result = { ...item };
-
-    if (hasPhoto === "yes" && item.photo) {
-      result.description += ` (Photo: /${options.cache}/${item.photo})`;
-    }
-
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(result));
-  });
-
-  return;
-}
+  res.json(result);
+});
 
 /**
  * GET /swagger.json
  * Повертає Swagger-документацію в JSON.
  */
-if (method === "GET" && url === "/swagger.json") {
-  res.writeHead(200, { "Content-Type": "application/json" });
+app.get("/swagger.json", (req, res) => {
   const swagger = fs.readFileSync("./swagger.json", "utf-8");
-  return res.end(swagger);
-}
+  res.setHeader("Content-Type", "application/json");
+  res.send(swagger);
+});
 
 /**
  * GET /docs
  * Відображає Swagger UI.
  */
-if (method === "GET" && url === "/docs") {
-  res.writeHead(200, { "Content-Type": "text/html" });
+app.get("/docs", (req, res) => {
   const html = `
     <!DOCTYPE html>
     <html>
@@ -336,14 +228,15 @@ if (method === "GET" && url === "/docs") {
       </body>
     </html>
   `;
-  return res.end(html);
-}
+  res.send(html);
+});
 
-  res.statusCode = 405;
-  res.end("Method Not Allowed");
+// 404 handler
+app.use((req, res) => {
+  res.status(405).send("Method Not Allowed");
 });
 
   
-server.listen(options.port, options.host, () => {
+app.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}/`);
 });

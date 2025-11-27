@@ -4,7 +4,6 @@
   "type": "module",
   "description": "",
   "main": "main.js",
-
   "scripts": {
     "start": "node main.js",
     "dev": "nodemon main.js",
@@ -23,7 +22,9 @@
   "homepage": "https://github.com/VixToryH/backend-course-2025-6#readme",
   "dependencies": {
     "commander": "^14.0.2",
+    "express": "^5.1.0",
     "formidable": "^3.5.4",
+    "multer": "^2.0.2",
     "superagent": "^10.2.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
